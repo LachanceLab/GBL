@@ -1,0 +1,220 @@
+configfile: "config/config.yaml"
+EXTENSIONS_DATABASE=["nhr", "nin", "nnd", "nni", "nog", "nsq", "translation"]
+
+rule all:
+     input:
+         f"{config['assembly']}.gff",
+         "plots/",
+         "predicted_genes_and_trnas_merged.gff",
+         "functional_annotation"
+
+rule download_proteins_of_close_species:
+    output:
+        komodo="close_species/Komodo_Dragon.faa",
+        asian_glass_lizard="close_species/Asian_Glass_Lizard.faa",
+        green_anole="close_species/Green_Anole.faa"
+    shell:
+        "wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/004/798/865/GCF_004798865.1_ASM479886v1/GCF_004798865.1_ASM479886v1_protein.faa.gz -O close_species/Komodo_Dragon.faa.gz; " \
+        "wget https://ftp.cngb.org/pub/gigadb/pub/10.5524/100001_101000/100119/O.gracilis.final.gene.pep.fa -O close_species/Asian_Glass_Lizard.faa; " \
+        "wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/090/745/GCF_000090745.1_AnoCar2.0/GCF_000090745.1_AnoCar2.0_protein.faa.gz -O close_species/Green_Anole.faa.gz; " \
+        "gunzip close_species/*gz;"
+
+
+rule build_database:
+    input:
+        config['assembly']
+    params:
+        prefix=config['library_prefix']
+    conda: "envs/repeatmasker.yaml"
+    output:
+        expand("{prefix}.{ext}", prefix=config['library_prefix'], ext=EXTENSIONS_DATABASE)
+    shell:
+        "BuildDatabase -name '{params.prefix}' {input}"
+
+rule build_library:
+    input:
+        rules.build_database.output
+    output:
+        families="{}-families.fa".format(config['library_prefix']),
+        statistics="{}-families.stk".format(config['library_prefix'])
+    threads: 36
+    conda: "envs/repeatmasker.yaml"
+    shell:
+        "RepeatModeler -database {config[library_prefix]} -pa {threads}"
+
+rule mask_repeats:
+    input:
+        genome=config['assembly'],
+        repeat_library=rules.build_library.output.families
+    conda: "envs/repeatmasker.yaml"
+    threads: 36
+    output:
+        out=f"{config['assembly']}.out",
+        masked=f"{config['assembly']}.masked",
+        tbl=f"{config['assembly']}.tbl"
+    shell:
+        "RepeatMasker -e {config[alignment_algo]} -lib {input.repeat_library} -xsmall {config[assembly]} -pa {threads}"
+
+rule repeatmasker_to_gff:
+    input:
+        rules.mask_repeats.output.out
+    output:
+        f"{config['assembly']}.gff"
+    conda: "envs/repeatmasker.yaml"
+    shell:
+        "{config[path_to_rmOutTogff3]} {input} > {output}"
+
+
+rule find_long_trf:
+    input:
+        config['assembly']
+    output:
+        data=f"{config['assembly']}.2.7.7.80.10.50.500.dat",
+        mask=f"{config['assembly']}.2.7.7.80.10.50.500.mask"
+    conda: "envs/trf.yaml"
+    shell:
+        "trf {input} 2 7 7 80 10 50 500 -d -m -h"
+
+rule trf_to_gff:
+    input:
+        rules.find_long_trf.output.data
+    output:
+        gff=f"{config['assembly']}.2.7.7.80.10.50.500.raw.gff",
+        gc="STATS.GC",
+        period_counts="STATS.periodCounts",
+        period_length="STATS.periodSeqLengths"
+    conda: "envs/trf.yaml"
+    shell:
+        "scripts/parseTrfOutput.py {input} --minCopies 1 --statistics STATS --gc > {output.gff}"
+
+
+rule sort_trf_gff:
+    input:
+        rules.trf_to_gff.output.gff
+    output:
+        f"{config['assembly']}.2.7.7.80.10.50.500.sorted.gff"
+    shell:
+        "sort -k1,1 -k4,4n -k5,5n {input} > {output}"
+
+
+rule merge_overlapping_trf:
+    input:
+        rules.sort_trf_gff.output
+    output:
+        f"{config['assembly']}.2.7.7.80.10.50.500.merged.gff"
+    shell:
+        "bedtools merge -i {input} | awk 'BEGIN{{OFS=\"\\t\"}} {{print $1,\"trf\",\"repeat\",$2+1,$3,\".\",\".\",\".\",\".\"}}' > {output}"
+
+rule combine_trf_and_repeat_masking:
+    input:
+        gff=rules.merge_overlapping_trf.output,
+        genome=rules.mask_repeats.output.masked
+    output:
+        f"{config['assembly']}.combined.masked"
+    shell:
+        "bedtools maskfasta -fi {input.genome} -bed {input.gff} -fo {output} -soft"
+
+rule combine_trf_and_repeat_masking_gff:
+    input:
+        trf=rules.merge_overlapping_trf.output,
+        rm=rules.repeatmasker_to_gff.output
+    output:
+        f"{config['assembly']}.combined.masked.gff"
+    shell:
+        # combine gff from RM and TRF --> sort --> merge overlapping intervals --> write to gff
+        "cat {input} | sort -k1,1 -k4,4n -k5,5n | bedtools merge -i - | awk 'BEGIN{{OFS=\"\\t\"}} {{print $1,\"trf/rm\",\"repeat\",$2+1,$3,\".\",\".\",\".\",\".\"}}' > {output}"
+
+rule predict_genes:
+    input:
+        rules.combine_trf_and_repeat_masking.output
+    output:
+        directory("gene_annotation")
+    conda: "envs/braker2.yaml"
+    threads: 36
+    shell:
+         "braker.pl --species GBL --genome={input} --prot_seq={config[odb]} --softmasking --cores {threads} --gff3 --workingdir=./gene_annotation/"
+
+rule predict_trnas:
+    input:
+        {config['assembly']}
+    output:
+        iso='trnas.iso',
+        struct='trnas.struct',
+        out='trnas.out',
+        stats='trnas.stats',
+        gff='trnas.gff'
+    conda: "envs/trnascan.yaml"
+    threads: 36
+    shell:
+         "tRNAscan-SE -E -Q --detail -s {output.iso} -o {output.out} -m {output.stats} -f {output.struct} -j {output.gff} --threads {threads} {input}"
+
+rule filter_trnas:
+    input:
+        trnas=rules.predict_trnas.output.gff,
+        repeats=rules.combine_trf_and_repeat_masking_gff.output
+    output:
+        "filtered_tRNAs.gff"
+    shell:
+        "bedtools intersect -wao -a {input.trnas} -b {input.repeats} | awk -F '\\t' 'BEGIN{{OFS=\"\\t\"}} \
+        {{if ($3 == \"tRNA\" && $NF <= ($5 - $4) / 2) print $1,$2,$3,$4,$5,$6,$7,$8,$9}}' | sort -k1,1 -k4,4n -k5,5n > {output}"
+
+
+rule merge_predicted_genes_and_trnas:
+    input:
+        trnas=rules.filter_trnas.output,
+        genes=rules.predict_genes.output
+    output:
+        "predicted_genes_and_trnas_merged.gff"
+    shell:
+        "cat {input.trnas} {input.genes}/augustus.hints.gff3 | sort -k1,1 -k4,4n -k5,5n > {output}"
+rule run_busco:
+    input:
+        rules.predict_genes.output
+    output:
+        directory("Guatemalan_Beaded_Lizard")
+    conda: "envs/busco.yaml"
+    threads: 36
+    shell:
+        "busco -m protein -i {input}/augustus.hints.aa -o {output} -l {config[busco_lineage]} -c {threads}"
+
+rule run_busco_close_species:
+    input:
+        komodo=rules.download_proteins_of_close_species.output.komodo,
+        green_anole=rules.download_proteins_of_close_species.output.green_anole,
+        asian_glass_lizar=rules.download_proteins_of_close_species.output.asian_glass_lizard
+    output:
+        komodo=directory("Komodo_Dragon"),
+        asian_glass_lizard=directory("Asian_Glass_Lizard"),
+        green_anole=directory("Green_Anole")
+    conda: "envs/busco.yaml"
+    threads: 36
+    shell:
+        "busco -m protein -i {input.komodo} -o {output.komodo} -l {config[busco_lineage]} -c {threads}; "
+        "busco -m protein -i {input.asian_glass_lizar} -o {output.asian_glass_lizard} -l {config[busco_lineage]} -c {threads}; "
+        "busco -m protein -i {input.green_anole} -o {output.green_anole} -l {config[busco_lineage]} -c {threads}"
+
+
+rule plot_busco:
+    input:
+        rules.run_busco.output,
+        rules.run_busco_close_species.output
+    output:
+        directory("plots")
+    conda: "envs/busco.yaml"
+    shell:
+        "mkdir plots; "
+        "for input_folder in {input}; do cp ${{input_folder}}/short_summary*.txt {output}; done; "
+        "scripts/generate_plot.py -wd {output}"
+
+
+rule functional_annotation:
+    input:
+        rules.predict_genes.output
+    output:
+        directory("functional_annotation")
+    threads: 36
+    conda: "envs/interproscan.yaml"
+    shell:
+        "mkdir -p {output}; "
+        "sed -e 's/*$//' {input}/augustus.hints.aa > {output}/augustus.hints.aa.cleaned; "
+        "interproscan.sh -d {output} --goterms -i {output}/augustus.hints.aa.cleaned --cpu {threads}"

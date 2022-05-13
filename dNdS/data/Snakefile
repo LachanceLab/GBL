@@ -1,0 +1,105 @@
+import os
+import glob
+from Bio import AlignIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Align import MultipleSeqAlignment
+from Bio.Align.Applications import ClustalOmegaCommandline
+import pandas as pd
+import subprocess
+
+
+configfile: "config/config.yaml"
+
+
+def get_single_copy_orthologs(input_file):
+    orthologs = pd.read_csv(input_file, sep='\t', header=0)
+    orthologs.dropna(inplace=True)
+    species = [c.split('_cds_aa')[0] for c in orthologs.columns if "cds_aa" in c]
+    single_copy_orthologs = orthologs[orthologs.applymap(lambda x: len(x.split(', '))).iloc[:, -len(species):].sum(axis=1) == len(species)]
+    single_copy_orthologs.set_index('HOG', drop=True, inplace=True)
+    return single_copy_orthologs.index.sort_values()
+
+
+rule all:
+    input:
+        "gbl_cds_nt.fasta",
+        "asian_glass_lizard_cds_nt.fasta",
+        'anole_cds_nt.fasta',
+        "komodo_cds_nt.fasta",
+        "proteome_dir/gbl_cds_aa.fasta",
+        "proteome_dir/asian_glass_lizard_cds_aa.fasta",
+        "proteome_dir/anole_cds_aa.fasta",
+        "proteome_dir/komodo_cds_aa.fasta",
+        "anole_id_gene_mapping.tab"
+        #"proteome_dir/orthologs/Results_1/Phylogenetic_Hierarchical_Orthogroups/N0.tsv",
+
+rule download_data:
+    output:
+        fasta_glass_lizard="asian_glass_lizard_assembly.fasta",
+        gff_glass_lizard="asian_glass_lizard_annotation.gff",
+        fasta_anole="anole_assembly.fasta",
+        gff_anole='anole_annotation.gff',
+        fasta_komodo="komodo_dragon_assembly.fasta",
+        gff_komodo="komodo_dragon_annotation.gff"
+    shell:
+        "wget -O {output.fasta_glass_lizard} {config[assembly_glass_lizard]}; "
+        "wget -O {output.gff_glass_lizard} {config[annotation_glass_lizard]}; "
+        "wget -O {output.fasta_anole}.gz {config[assembly_green_anole]}; "
+        "gunzip {output.fasta_anole}.gz; "
+        "wget -O {output.gff_anole}.gz {config[annotation_green_anole]}; "
+        "gunzip {output.gff_anole}.gz; "
+        "wget -O {output.fasta_komodo}.gz {config[assembly_komodo]}; "
+        "gunzip {output.fasta_komodo}.gz; "
+        "wget -O {output.gff_komodo}.gz {config[annotation_komodo]}; "
+        "gunzip {output.gff_komodo}.gz"
+
+
+rule extract_mRNA:
+    input:
+        fasta_gbl=config["assembly_gbl"],
+        gff_gbl=config["annotation_gbl"],
+        fasta_glass_lizard=rules.download_data.output.fasta_glass_lizard,
+        gff_glass_lizard=rules.download_data.output.gff_glass_lizard,
+        fasta_anole=rules.download_data.output.fasta_anole,
+        gff_anole=rules.download_data.output.gff_anole,
+        fasta_komodo=rules.download_data.output.fasta_komodo,
+        gff_komodo=rules.download_data.output.gff_komodo
+    output:
+        mRNA_gbl="gbl_cds_nt.fasta",
+        mRNA_glass_lizard="asian_glass_lizard_cds_nt.fasta",
+        mRNA_anole='anole_cds_nt.fasta',
+        mRNA_komodo='komodo_cds_nt.fasta',
+        pep_gbl="proteome_dir/gbl_cds_aa.fasta",
+        pep_glass_lizard="proteome_dir/asian_glass_lizard_cds_aa.fasta",
+        pep_anole="proteome_dir/anole_cds_aa.fasta",
+        pep_komodo="proteome_dir/komodo_cds_aa.fasta"
+    shell:
+        # -C --> coding only, -V --> discard CDS with in-frame stop,
+        # -H --> try adjusted CDS start phase if in-frame stop, -J discard CDS that lack start codon or terminal stop
+        "gffread -C -V -H -J -x {output.mRNA_gbl} -y {output.pep_gbl} -g {input.fasta_gbl} {input.gff_gbl}; "
+        "gffread -C -V -H -J -x {output.mRNA_glass_lizard} -y {output.pep_glass_lizard} -g {input.fasta_glass_lizard} {input.gff_glass_lizard}; "
+        "gffread -C -V -H -J -x {output.mRNA_anole} -y {output.pep_anole} -g {input.fasta_anole} {input.gff_anole}; "
+        "gffread -C -V -H -J -x {output.mRNA_komodo} -y {output.pep_komodo} -g {input.fasta_komodo} {input.gff_komodo}"
+
+rule map_anole_ids_genes:
+    input:
+        rules.download_data.output.gff_anole
+    output:
+        "anole_id_gene_mapping.tab"
+    shell:
+        "cut -f9 {input} | awk -F 'ID=' '{{print $2}}' | cut -d ';' -f1 > tmp_ids.txt; "
+        "cut -f9 {input} | awk -F 'gene=' '{{print $2}}' | cut -d ';' -f1 > tmp_genes.txt; "
+        "paste tmp_ids.txt tmp_genes.txt > {output}"
+
+
+#rule find_orthologs:
+#    input:
+#        rules.extract_mRNA.output 
+#    output:
+#        "proteome_dir/orthologs/Results_1/Phylogenetic_Hierarchical_Orthogroups/N0.tsv"
+#    threads: 16
+#    shell:
+#        "orthofinder.py -t {threads} -f proteome_dir -o proteome_dir/orthologs -n 1"
+
+

@@ -1,0 +1,6 @@
+assembly: "GBL_genome_assembly.fasta"
+library_prefix: "gbl_repeats"
+alignment_algo: "rmblast"
+path_to_rmOutTogff3: "~/.conda/envs/repeatmasker/share/RepeatMasker/util/rmOutToGFF3.pl"
+odb: '/storage/home/hcoda1/3/apfennig3/vertebrate/proteins.fasta'
+busco_lineage: "vertebrata_odb10"

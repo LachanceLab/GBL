@@ -1,0 +1,42 @@
+name: orthofinder
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=1_gnu
+  - bzip2=1.0.8=h7f98852_4
+  - ca-certificates=2021.10.8=ha878542_0
+  - iqtree=2.2.0_beta=hdcc8f71_0
+  - ld_impl_linux-64=2.36.1=hea4e1c9_2
+  - libblas=3.9.0=13_linux64_openblas
+  - libcblas=3.9.0=13_linux64_openblas
+  - libffi=3.4.2=h7f98852_5
+  - libgcc-ng=11.2.0=h1d223b6_12
+  - libgfortran-ng=11.2.0=h69a702a_12
+  - libgfortran5=11.2.0=h5c6108e_12
+  - libgomp=11.2.0=h1d223b6_12
+  - liblapack=3.9.0=13_linux64_openblas
+  - libnsl=2.0.0=h7f98852_0
+  - libopenblas=0.3.18=pthreads_h8fe5266_0
+  - libstdcxx-ng=11.2.0=he4da1e4_12
+  - libuuid=2.32.1=h7f98852_1000
+  - libzlib=1.2.11=h36c2ea0_1013
+  - muscle=3.8.1551=h7d875b9_6
+  - ncurses=6.3=h9c3ff4c_0
+  - numpy=1.22.2=py310h454958d_0
+  - openssl=3.0.0=h7f98852_2
+  - pip=22.0.3=pyhd8ed1ab_0
+  - python=3.10.2=hc74c709_3_cpython
+  - python_abi=3.10=2_cp310
+  - readline=8.1=h46c0cb4_0
+  - scipy=1.8.0=py310hea5193d_0
+  - setuptools=60.8.1=py310hff52083_0
+  - sqlite=3.37.0=h9cd32fc_0
+  - tk=8.6.11=h27826a3_1
+  - tzdata=2021e=he74cb21_0
+  - wheel=0.37.1=pyhd8ed1ab_0
+  - xz=5.2.5=h516909a_1
+  - zlib=1.2.11=h36c2ea0_1013
+prefix: /home/admin-aaron/anaconda3/envs/orthofinder

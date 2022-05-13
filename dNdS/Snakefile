@@ -1,0 +1,214 @@
+import os
+import glob
+from Bio import AlignIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Align import MultipleSeqAlignment
+from Bio.Align.Applications import ClustalOmegaCommandline
+import pandas as pd
+import subprocess
+import shutil
+
+configfile: "config/config.yaml"
+
+def write_codeml_ctl(alignment_file, tree_file, selection=True):
+    with open(f"codeml.ctl", "w") as conf:
+        conf.write(f"seqfile = ../{alignment_file}")
+        conf.write('\n')
+        conf.write("clock = 0")
+        conf.write('\n')
+        conf.write("runmode = 0")
+        conf.write('\n')
+        conf.write("seqtype = 1")
+        conf.write('\n')
+        conf.write(f"treefile = ../{tree_file}")
+        conf.write('\n')
+        conf.write('NSsites = 0')
+        conf.write('\n')
+        if selection:
+            conf.write(f"outfile = ../{alignment_file.replace('_nt.phy', '_dnds.txt')}")
+            conf.write('\n')
+            conf.write("model = 1") # branch site model model A
+            conf.write('\n')
+            conf.write("fix_omega = 0")
+        # simple neutral model
+        else:
+            conf.write(f"outfile = ../{alignment_file.replace('_nt.phy', '_neutral_dnds.txt')}")
+            conf.write('\n')
+            conf.write("model = 0") # branch site model model A
+            conf.write('\n')
+            conf.write("fix_omega = 0")
+
+    conf.close()
+    
+def get_single_copy_orthologs(input_file):
+    orthologs = pd.read_csv(input_file, sep='\t', header=0)
+    orthologs.dropna(inplace=True)
+    species = [c.split('_cds_aa')[0] for c in orthologs.columns if "cds_aa" in c]
+    single_copy_orthologs = orthologs[orthologs.applymap(lambda x: len(x.split(', '))).iloc[:, -len(species):].sum(axis=1) == len(species)]
+    single_copy_orthologs.set_index('HOG', drop=True, inplace=True)
+    return single_copy_orthologs.index.sort_values()
+
+
+rule all:
+    input:
+        "summary_dnds.tab",
+        'genes_background.txt',
+        'genes_diff_rate.txt',
+        'genes_dnds_bottom_10.txt',
+        'genes_dnds_top_10.txt',
+        f'genes_dnds_top_{config["dnds_thresh"]}.txt',
+        f'genes_dnds_bottom_{config["dnds_thresh"]}.txt'
+
+rule extract_single_copy_orthologs:
+    input:
+        input_file=config['N0'],
+        mRNA_gbl=config["mRNA_gbl"],
+        mRNA_glass_lizard=config["mRNA_glass_lizard"],
+        mRNA_anole=config["mRNA_anole"],
+        mRNA_komodo=config["mRNA_komodo"],
+        pep_gbl=config["pep_gbl"],
+        pep_glass_lizard=config["pep_glass_lizard"],
+        pep_anole=config["pep_anole"],
+        pep_komodo=config['pep_komodo']
+    params:
+        output_dir="data/proteome_dir/single_copy_orthologs/"
+    output:
+        nt_seqs=expand("data/proteome_dir/single_copy_orthologs/{hog_id}.fna", hog_id=sorted(get_single_copy_orthologs(config["N0"]))),
+        aa_seqs=expand("data/proteome_dir/single_copy_orthologs/{hog_id}.faa", hog_id=sorted(get_single_copy_orthologs(config["N0"])))
+    shell:
+        "python scripts/parse_ortholog_groups.py -i {input.input_file} -o {params.output_dir} -nt {input.mRNA_gbl} \
+        {input.mRNA_glass_lizard} {input.mRNA_anole} {input.mRNA_komodo} \
+        -aa {input.pep_gbl} {input.pep_glass_lizard} {input.pep_anole} {input.pep_komodo}"
+
+rule msa_proteins:
+   input:
+       rules.extract_single_copy_orthologs.output.aa_seqs
+   output:
+        alignments=expand("data/proteome_dir/single_copy_orthologs/{hog_id}_aa.phy", hog_id=sorted(get_single_copy_orthologs(config["N0"])))
+   threads: 16
+   run:
+       for infile in input:
+           clustalomega_cline = ClustalOmegaCommandline(infile=infile, outfile=infile.replace('.faa', '_aa.phy'), outfmt='phy', threads=threads)
+           clustalomega_cline()
+
+
+rule reverse_translate:
+    input:
+        alignments=rules.msa_proteins.output,
+        cds=rules.extract_single_copy_orthologs.output.nt_seqs
+    output:
+        alignments=expand("data/proteome_dir/single_copy_orthologs/{hog_id}_nt.phy", hog_id=get_single_copy_orthologs(config['N0'])),
+    shell:
+        "python scripts/reverse_transcribe_alignments.py -a {input.alignments} -c {input.cds} -o {output.alignments} -s {config[species]}"
+
+
+rule concatenate_alignments:
+    input:
+        rules.reverse_translate.output
+    output:
+        "data/proteome_dir/concatenate_single_ortholog_msa.phy"
+    run:
+        concatenated_alignment = {"gbl": "", "anole": "", "glass": "", "komodo": ""}
+
+
+        for f in input:
+            with open(f, "r") as infile:
+                infile.readline()
+                for i, line in enumerate(infile):
+                    line = line.strip().split('  ')
+                    concatenated_alignment[line[0]] += Seq(line[1])
+
+            infile.close()
+        alignments = []
+        for species, alignment in concatenated_alignment.items():
+            record = SeqRecord(alignment, id=species, name=species, description=species)
+            alignments.append(record)
+        msa = MultipleSeqAlignment(alignments)
+        AlignIO.write(msa, "data/proteome_dir/concatenate_single_ortholog_msa.phy", "phylip")
+
+rule build_phylogenetic_tree:
+    input:
+        rules.concatenate_alignments.output
+    output:
+        tree="tree.nwk"
+    conda: "envs/orthofinder.yml"
+    threads: 16
+    shell:
+        "iqtree2 -s {input} -nt {threads} -m MF --redo; mv {input}.treefile {output.tree}"
+
+rule compute_dnds_selection:
+    input:
+        alignments=rules.reverse_translate.output,
+        tree=rules.build_phylogenetic_tree.output.tree
+    params:
+        tmp_folder = 'tmp_selection'
+    output:
+        dnds=expand("data/proteome_dir/single_copy_orthologs/{hog_id}_dnds.txt", hog_id=sorted(get_single_copy_orthologs(config["N0"])))
+    run:
+        if not os.path.isdir(params.tmp_folder):
+            os.mkdir(params.tmp_folder)
+        if not os.path.isfile(f"{params.tmp_folder}/codeml"):
+            shutil.copy("codeml", params.tmp_folder)
+        os.chdir(params.tmp_folder)
+        for aln in input.alignments:
+            write_codeml_ctl(aln, input.tree, True)
+            subprocess.call("./codeml")
+        os.chdir('..')
+        shutil.rmtree(params.tmp_folder, ignore_errors=True)
+
+
+
+rule compute_dnds_neutral:
+    input:
+        alignments=rules.reverse_translate.output,
+        tree=rules.build_phylogenetic_tree.output.tree,
+    params:
+        tmp_folder = 'tmp_neutral'
+    output:
+        dnds=expand("data/proteome_dir/single_copy_orthologs/{hog_id}_neutral_dnds.txt", hog_id=sorted(get_single_copy_orthologs(config["N0"])))
+    run:
+        if not os.path.isdir(params.tmp_folder):
+            os.mkdir(params.tmp_folder)
+        if not os.path.isfile(f"{params.tmp_folder}/codeml"):
+            shutil.copy("codeml", params.tmp_folder)
+        os.chdir(params.tmp_folder)
+        for aln in input.alignments:
+            write_codeml_ctl(aln, input.tree, False)
+            subprocess.call("./codeml")
+        os.chdir('..')
+        shutil.rmtree(params.tmp_folder, ignore_errors=True)
+
+rule summarize_dnds:
+    input:
+        dnds_selection=rules.compute_dnds_selection.output,
+        dnds_neutral=rules.compute_dnds_neutral.output,
+        orthologs=config['N0']
+    output:
+        background="summary_dnds.tab",
+        diff_rate='summary_dnds_diff_rate.tab',
+        genes_bg='genes_background.txt',
+        genes_top=f'genes_dnds_top_{config["dnds_thresh"]}.txt',
+        genes_bottom=f'genes_dnds_bottom_{config["dnds_thresh"]}.txt',
+        genes_diff_rate='genes_diff_rate.txt'
+    log: "log/summarized_dnds.log"
+    shell:
+        "python scripts/parse_dnds_results.py -b {input.dnds_selection} -s {input.dnds_neutral} --orthologs {input.orthologs} "
+        "-a {config[alpha]} -k {config[degrees_of_freedom]} "
+        "--output_complete {output.background} --dnds_thresh {config[dnds_thresh]} --output_diff_rate {output.diff_rate} "
+        "--gene_list_background {output.genes_bg} --gene_list_top {output.genes_top} --gene_list_bottom {output.genes_bottom} "
+        "--gene_list_diff_rate {output.genes_diff_rate}"
+
+
+#rule extract_anole_gene_names:
+#    input:
+#        selection=rules.summarize_dnds.output.selection,
+#        background=rules.summarize_dnds.output.background
+#    output:
+#        selection="genes_under_selection.txt",
+#        background="genes_background.txt"
+#    params:
+#        anole_gff=config['anole_gff']
+#    shell:
+#        "awk -F '\\t' '{{print $7}}' {input.selection} | xargs -I {{}} grep {{}} {params.anole_gff} | awk -F 'gene=' '{{print $2}}' | cut -d ';' -f1 | sort | uniq > {output.selection}; "
+#        "awk -F '\\t' '{{print $7}}' {input.background} | xargs -I {{}} grep {{}} {params.anole_gff} | awk -F 'gene=' '{{print $2}}' | cut -d ';' -f1 | sort | uniq > {output.background}"

@@ -1,0 +1,10 @@
+assembly_glass_lizard: "https://ftp.cngb.org/pub/gigadb/pub/10.5524/100001_101000/100119/O.gracilis.final.assembly.fa"
+annotation_glass_lizard: "https://ftp.cngb.org/pub/gigadb/pub/10.5524/100001_101000/100119/O.gracilis.final.gene.gff"
+assembly_green_anole: "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/090/745/GCF_000090745.1_AnoCar2.0/GCF_000090745.1_AnoCar2.0_genomic.fna.gz"
+annotation_green_anole: "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/090/745/GCF_000090745.1_AnoCar2.0/GCF_000090745.1_AnoCar2.0_genomic.gff.gz"
+assembly_gbl: "../../genome_annotation/GBL_genome_assembly.fasta.combined.masked"
+annotation_gbl: "../../genome_annotation/gene_annotation/augustus.hints.gff3"
+assembly_komodo: "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/004/798/865/GCF_004798865.1_ASM479886v1/GCF_004798865.1_ASM479886v1_genomic.fna.gz"
+annotation_komodo: "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/004/798/865/GCF_004798865.1_ASM479886v1/GCF_004798865.1_ASM479886v1_genomic.gff.gz"
+alpha: 0.05
+degrees_of_freedom: 1

@@ -1,0 +1,9 @@
+name: hmmer
+channels:
+  - biocore
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - hmmer=3.1b2=0
+prefix: /home/admin-aaron/anaconda3/envs/hmmer

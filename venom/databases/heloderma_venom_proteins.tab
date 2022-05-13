@@ -1,0 +1,21 @@
+Entry	Entry name	Status	Protein names	Gene names	Organism	Length	Protein families
+Q91055	CRVP_HELHO	reviewed	Cysteine-rich venom protein helothermine (CRVP HLTx)		Heloderma horridum horridum (Mexican beaded lizard)	242	CRISP family
+C6EVG1	EXE4_HELSC	reviewed	Exendin-4		Heloderma suspectum cinctum (Banded Gila monster)	87	Glucagon family
+C6EVG2	EXE2_HELSC	reviewed	Exendin-2-long [Cleaved into: Exendin-2 (Helodermin) (VIP-like 2)]		Heloderma suspectum cinctum (Banded Gila monster)	84	Glucagon family
+P04203	EXE1_HELSU	reviewed	Exendin-1 (Helospectin I) (Helospectin-1) (VIP-like 1) [Cleaved into: Exendin-1b (Helospectin II) (Helospectin-2)]		Heloderma suspectum (Gila monster)	38	Glucagon family
+P04204	EXE2_HELSU	reviewed	Exendin-2-long [Cleaved into: Exendin-2 (Helodermin) (VIP-like 2)]		Heloderma suspectum (Gila monster)	84	Glucagon family
+P20394	EXE3_HELHO	reviewed	Exendin-3 (Glucagon-like 3)		Heloderma horridum horridum (Mexican beaded lizard)	87	Glucagon family
+P26349	EXE4_HELSU	reviewed	Exendin-4 (Exenatide)		Heloderma suspectum (Gila monster)	87	Glucagon family
+C6EVG6	LETH1_HELSC	reviewed	Helofensin-1 (Lethal toxin 1)		Heloderma suspectum cinctum (Banded Gila monster)	183	Beta-defensin family, Helofensin subfamily
+D2X5W3	LETH2_HELSC	reviewed	Helofensin-2 (Lethal toxin 2)		Heloderma suspectum cinctum (Banded Gila monster)	183	Beta-defensin family, Helofensin subfamily
+D2X5W4	LETH3_HELSC	reviewed	Helofensin-3 (Lethal toxin 3)		Heloderma suspectum cinctum (Banded Gila monster)	182	Beta-defensin family, Helofensin subfamily
+Q7LZ31	LETH1_HELHO	reviewed	Helofensin-1 (Lethal toxin) (Fragment)		Heloderma horridum horridum (Mexican beaded lizard)	33	Beta-defensin family, Helofensin subfamily
+P43685	GILX_HELHO	reviewed	Gilatoxin (GTX) (EC 3.4.21.-) (Kallikrein-2)		Heloderma horridum horridum (Mexican beaded lizard)	230	Peptidase S1 family
+C6EVG4	C6EVG4_HELSC	unreviewed	Kallikrein toxin 1		Heloderma suspectum cinctum (Banded Gila monster)	255	Peptidase S1 family, Snake venom subfamily
+C6EVG5	C6EVG5_HELSC	unreviewed	Kallikrein toxin 2 (Fragment)		Heloderma suspectum cinctum (Banded Gila monster)	196	Peptidase S1 family, Snake venom subfamily
+C6EVG7	VNHP_HELSC	reviewed	Natriuretic and helokinestatin peptides [Cleaved into: Helokinestatin-1 (HKS-1); Helokinestatin-2 (HKS-2); Helokinestatin-3 (HKS-3); Helokinestatin-4 (HKS-4); Natriuretic peptide]		Heloderma suspectum cinctum (Banded Gila monster)	178	Natriuretic peptide family
+D7FB56	D7FB56_HELSU	unreviewed	Preprohelokinestatin-1 protein	hkn-1	Heloderma suspectum (Gila monster)	177	Natriuretic peptide family
+D7FB57	D7FB57_HELSU	unreviewed	Preprohelokinestatin-2 protein	hkn-2	Heloderma suspectum (Gila monster)	178	Natriuretic peptide family
+E8ZCG5	E8ZCG5_HELHR	unreviewed	Preprohelokinestatin-3	hkn-3	Heloderma horridum (Mexican beaded lizard)	196	Natriuretic peptide family
+C6EVG9	C6EVG9_HELSC	unreviewed	Type III phospholipase A2 toxin 1		Heloderma suspectum cinctum (Banded Gila monster)	147	
+C6EVH0	C6EVH0_HELSC	unreviewed	Type III phospholipase A2 toxin 2		Heloderma suspectum cinctum (Banded Gila monster)	158	

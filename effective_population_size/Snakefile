@@ -1,0 +1,282 @@
+from Bio import SeqIO
+
+configfile: "config/config.yaml"
+
+
+def get_index_name(ref):
+    if ref.endswith(".fasta"):
+        index = ref.replace(".fasta", ".mmi")
+    elif ref.endswith(".fna"):
+        index = ref.replace(".fna", ".mmi")
+    elif ref.endswith(".fa"):
+        index = ref.replace(".fa", ".mmi")
+    else:
+        print("Reference sequence has unknown format. Must end with .fasta, .fna, or .fa")
+    return index
+
+def read_contigs(ref, suffix):
+    outputs = []
+    contigs = [record.id for record in SeqIO.parse(ref, "fasta")]
+    for con in contigs:
+        outputs.append("vcfs_per_scaff/{}{}".format(con, suffix))
+    return outputs
+
+
+rule all:
+    input:
+        get_index_name(config["reference"]),
+        config["species"] + "_ref.alignmentset.ref.collapsed.fasta.fai",
+        "psmc_results/" + config["species"] + "_diploid.psmc",
+        expand("psmc_results/round-{iteration}.psmc", iteration=[i for i in range(1, 101)])
+
+
+rule merge_bam_files:
+    input:
+        config["subreads_A"],
+        config["subreads_B"]
+    output:
+        config["species"] + ".subreads.bam"
+    log: "log/merge_bam_files.log"
+    threads: 24
+    shell:
+        "samtools merge -@ {threads} -o {output} {input}"
+
+rule index_ref:
+    input:
+        config["reference"]
+    output:
+        get_index_name(config["reference"])
+    threads: 24
+    conda:
+        "envs/gbl.yaml"
+    log: "log/index_ref.log"
+    shell:
+        "pbmm2 index -j {threads} {input} {output}"
+
+rule align_reads:
+    input:
+        ref=config["reference"],
+        bam=rules.merge_bam_files.output
+    output:
+        bam=config["species"] + "_ref.alignmentset.bam",
+        ref=config["species"] + "_ref.alignmentset.ref.collapsed.fasta"
+    threads: 24
+    conda:
+        "envs/gbl.yaml"
+    log: "log/align_reads.log"
+    shell:
+        "pbmm2 align {input} {output.bam} --sort -j {threads} -J 8 --log-level DEBUG --collapse-homopolymers"
+
+rule index_collapsed_ref:
+    input:
+        rules.align_reads.output.ref
+    output:
+        config["species"] + "_ref.alignmentset.ref.collapsed.fasta.fai"
+    log: "log/index_collapsed_ref.log"
+    shell:
+       "samtools faidx {input}"
+
+rule get_contig_names:
+    input:
+        rules.align_reads.output.bam
+    output:
+        "contigs.txt"
+    log: "log/get_contig_names.log"
+    shell:
+        "samtools view -H {input} | awk '{{if ($1==\"@SQ\") print $2}}' | awk '{{gsub(/SN\:/,\"\"); print}}' | shuf > {output}"
+
+rule call_variants:
+    input:
+        contigs=rules.get_contig_names.output,
+        alignment=rules.align_reads.output.bam,
+        ref=rules.align_reads.output.ref
+    output:
+        read_contigs(config["reference"], ".vcf")
+    threads: 24
+    conda:
+        "envs/longshot.yaml"
+    log: "log/call_variants.log"
+    shell:
+        "cat {input.contigs} | xargs -I {{}} -P {threads} sh -c \"longshot --bam {input.alignment} --ref {input.ref} -r {{}} --out vcfs_per_scaff/{{}}.vcf\""
+
+rule filter_variants:
+    input:
+        contigs=rules.get_contig_names.output,
+        variants=rules.call_variants.output
+    output:
+        read_contigs(config["reference"], "_filtered.vcf")
+    threads: 24
+    log: "log/filtering_variants.log"
+    shell:
+        "cat {input.contigs} | xargs -I {{}} -P {threads} sh -c \"bcftools view -i 'QUAL >= {config[min_qual]} && INFO/DP >= {config[min_dp]}  && INFO/MQ20 >= {config[min_mq20]}' -o vcfs_per_scaff/{{}}_filtered.vcf vcfs_per_scaff/{{}}.vcf\""
+
+rule compress_variants:
+    input:
+        rules.filter_variants.output
+    output:
+        compressed=read_contigs(config["reference"], "_filtered.vcf.gz"),
+        index=read_contigs(config["reference"], "_filtered.vcf.gz.tbi")
+    log: "log/compress_variants.log"
+    conda:
+        "envs/tabix.yaml"
+    shell:
+        "for f in {input}; do bgzip $f; tabix $f.gz; done"
+
+rule merge_variants:
+    input:
+        rules.compress_variants.output.compressed
+    output:
+        variants=config["species"] + ".variants.vcf.gz",
+        index=config["species"] + ".variants.vcf.gz.tbi"
+    threads: 24
+    log: "log/merge_variants.log"
+    conda:
+        "envs/tabix.yaml"
+    shell:
+        "bcftools concat --threads {threads} -Oz -o {output.variants} {input}; "
+        "tabix {output.variants}"
+
+rule find_roh:
+    input:
+        rules.merge_variants.output.variants
+    output:
+        "roh.regions.bed"
+    log: "log/find_roh.log"
+    shell:
+        "bcftools roh -G {config[min_gt]} -I --AF-dflt {config[af_dflt]} -Or {input} | grep '^RG' | cut -f3,4,5 > {output}"
+
+rule exclude_roh_variants:
+    input:
+        variants=rules.merge_variants.output.variants,
+        roh=rules.find_roh.output
+    output:
+        variants=config["species"] + ".variants_filtered.vcf.gz",
+        index=config["species"] + ".variants_filtered.vcf.gz.tbi"
+    conda:
+        "envs/tabix.yaml"
+    log: "log/exclude_roh_variants.log"
+    shell:
+        "bcftools view -Oz -o {output.variants} -g het -T ^{input.roh} {input.variants}; "
+        "tabix {output.variants}"
+
+rule exclude_roh_ref:
+    input:
+        ref=rules.align_reads.output.ref,
+        roh=rules.find_roh.output
+    output:
+        config["species"] + "_ref.alignmentset.ref.collapsed_filtered_roh.fasta"
+    log: "log/exclude_roh_ref.log"
+    shell:
+        "bedtools maskfasta -bed {input.roh} -fi {input.ref} -fo {output}"
+
+rule index_filtered_ref:
+    input:
+        rules.exclude_roh_ref.output
+    output:
+        config["species"] + "_ref.alignmentset.ref.collapsed_filtered_roh.fasta.fai"
+    log: "log/index_filtered_ref.log"
+    shell:
+       "samtools faidx {input}"
+
+rule get_filtered_contig_names:
+    input:
+        rules.index_filtered_ref.output
+    output:
+        "contigs_filtered.txt"
+    log: "log/get_contig_names.log"
+    shell:
+        "cut -f1 {input} | shuf > {output}"
+
+rule get_contig_stats:
+    input:
+        index_ref=rules.index_filtered_ref.output,
+        contigs=rules.get_filtered_contig_names.output,
+        variants=rules.exclude_roh_variants.output.variants
+    output:
+        stats="contig_stats.tab",
+        size=temp("contig_sizes.txt"),
+        het=temp("het_sites_count.txt")
+    log: "log/get_contig_stats.log"
+    shell:
+        "cat {input.contigs} | xargs -I {{}} sh -c \"grep -w {{}} {input.index_ref} | cut -f2  >> {output.size}\"; "
+        "cat {input.contigs} | xargs -I {{}} sh -c \"bcftools view -H -r {{}}  {input.variants} | wc -l >> {output.het}\"; "
+        "paste {input.contigs} {output.size} | paste - {output.het} | awk '{{print $1,$2,$3,$3/$2}}' > {output.stats}"
+
+rule select_contigs:
+    input:
+        rules.get_contig_stats.output.stats
+    output:
+        "selected_contigs.txt"
+    log: "log/select_contigs.log"
+    shell:
+        "awk '{{if ($2 >= {config[min_contig_size]} && $4 >= {config[min_het]}) print $1}}' {input} > {output}"
+
+#rule select_contigs:
+#    input:
+#        contigs=rules.pre_select_contigs.output,
+#        variants=rules.merge_variants.output.variants
+#    output:
+#        "selected_contigs.txt"
+#    shell:
+#        "for con in $( cat {input.contigs} ); do bcftools view -H -r ${{con}} {input.variants} | \
+#awk -v contig=${{con}} -F '\\t' 'BEGIN{{P=1;M=0}} /^#/{{next}} {{L=int($2) - P;M=(M>L?M:L);P=int($2)}}END{{if (M <= 10000000) print contig}}'; done > {output}"
+
+rule build_consensus:
+    input:
+        ref=rules.exclude_roh_ref.output,
+        contigs=rules.select_contigs.output,
+        variants=rules.exclude_roh_variants.output.variants
+    output:
+        config["species"] + ".consensus.fasta"
+    log: "log/build_consensus.log"
+    shell:
+        "samtools faidx {input.ref} -r {input.contigs} | bcftools consensus -I {input.variants} > {output}"
+
+rule fasta_to_fastq:
+    input:
+        rules.build_consensus.output
+    output:
+        config["species"] + ".consensus.fastq"
+    conda:
+        "envs/seqtk.yaml"
+    log: "log/fasta_to_fastq.log"
+    shell:
+        "seqtk seq -F 'H' {input} > {output}"
+
+rule fastq_to_psmcfa:
+    input:
+        rules.fasta_to_fastq.output
+    output:
+        config["species"] + ".consensus.psmcfa"
+    log: "log/fastq_to_psmcfa.log"
+    shell:
+        "fq2psmcfa -q20 {input} > {output}"
+
+rule split_psmcfa:
+    input:
+        rules.fastq_to_psmcfa.output
+    output:
+        config["species"] + ".consensus_split.psmcfa"
+    log: "log/split_psmcfa.log"
+    shell:
+        "splitfa {input} > {output}"
+
+rule run_psmc:
+    input:
+        rules.fastq_to_psmcfa.output
+    output:
+        "psmc_results/" + config["species"] + "_diploid.psmc"
+    log: "log/run_psmc.log"
+    shell:
+        "psmc -N {config[max_iter]} -t {config[max_coal]} -r {config[theta_roh]} -p '{config[pattern_params]}' -o {output} {input}"
+
+rule bootstrap_psmc:
+    input:
+        rules.split_psmcfa.output
+    output:
+        expand("psmc_results/round-{iteration}.psmc", iteration=[i for i in range(1, 101)])
+    log: "log/bootstrap_psmc.log"
+    threads: 36
+    shell:
+        "seq 100 | xargs -I {{}} -P {threads} psmc -N {config[max_iter]} -t {config[max_coal]} -r {config[theta_roh]} -b -p {config[pattern_params]} -o psmc_results/round-{{}}.psmc {input}"
+

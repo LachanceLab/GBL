@@ -1,0 +1,28 @@
+generation_time: 4
+mutation_rate: 3.08e-9
+subreads_A: m64060_191008_205527.subreads.bam
+subreads_B: m64060_191011_210854.subreads.bam
+reference: GBL_genome_assembly.fasta
+species: gbl
+# Minimum quality of called heterozygous site
+min_qual: 60
+# minimum read depth at called heterozygous site
+min_dp: 40
+# at leas 99% of the reads aligning to heterozygous site have a mapping quality >= 20
+min_mq20: 0.99
+# allele frequence for ROH detection
+af_dflt: 0.1
+# minimum genotype quality for ROH detection
+min_gt: 30
+# minimum contig size 
+min_contig_size: 500000
+# minimum contig-wide heterozygosity
+min_het: 1 / 100000
+# maximum number of iterations PSMC
+max_iter: 25
+# maximum 2N0 coalescent time PSMC
+max_coal: 10
+# intial theta/rho ratio PSMC
+theta_roh: 5
+# pattern of parameters PSMC
+pattern_params: 2+40*2+4+6

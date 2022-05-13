@@ -1,0 +1,42 @@
+name: longshot
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=main
+  - _openmp_mutex=4.5=1_gnu
+  - bzip2=1.0.8=h7b6447c_0
+  - c-ares=1.17.1=h27cfd23_0
+  - ca-certificates=2021.10.26=h06a4308_2
+  - certifi=2020.12.5=py36h06a4308_0
+  - curl=7.78.0=h1ccaba5_0
+  - htslib=1.9=h4da6232_3
+  - krb5=1.19.2=hac12032_0
+  - ld_impl_linux-64=2.36.1=hea4e1c9_2
+  - libcurl=7.78.0=h0b77cf5_0
+  - libdeflate=1.2=h516909a_1
+  - libedit=3.1.20210216=h27cfd23_1
+  - libev=4.33=h7f8727e_1
+  - libffi=3.3=h58526e2_2
+  - libgcc-ng=9.3.0=h5101ec6_17
+  - libgomp=9.3.0=h5101ec6_17
+  - libnghttp2=1.41.0=hf8bcb03_2
+  - libssh2=1.9.0=h1ba5d50_1
+  - libstdcxx-ng=9.3.0=hd4cf53a_17
+  - longshot=0.4.1=h123da94_1
+  - ncurses=6.2=h58526e2_4
+  - openssl=1.1.1l=h7f8727e_0
+  - pip=21.3.1=pyhd8ed1ab_0
+  - py-bgzip=0.4.0=py36ha0a8d69_0
+  - python=3.6.13=hffdb5ce_0_cpython
+  - python_abi=3.6=2_cp36m
+  - readline=8.1=h46c0cb4_0
+  - setuptools=49.6.0=py36h5fab9bb_3
+  - sqlite=3.36.0=h9cd32fc_0
+  - tabix=1.11=hdfd78af_0
+  - tk=8.6.11=h21135ba_0
+  - wheel=0.37.0=pyhd8ed1ab_1
+  - xz=5.2.5=h7b6447c_0
+  - zlib=1.2.11=h7b6447c_3
+prefix: /storage/home/hcoda1/3/apfennig3/.conda/envs/longshot

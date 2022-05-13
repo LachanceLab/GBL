@@ -1,0 +1,12 @@
+name: trf
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=main
+  - _openmp_mutex=4.5=1_gnu
+  - libgcc-ng=9.3.0=h5101ec6_17
+  - libgomp=9.3.0=h5101ec6_17
+  - trf=4.09.1=h779adbc_1
+prefix: /storage/home/hcoda1/3/apfennig3/.conda/envs/trf

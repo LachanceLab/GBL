@@ -1,0 +1,13 @@
+mRNA_gbl: "data/gbl_cds_nt.fasta"
+mRNA_glass_lizard: "data/asian_glass_lizard_cds_nt.fasta"
+mRNA_anole: 'data/anole_cds_nt.fasta'
+mRNA_komodo: 'data/komodo_cds_nt.fasta'
+pep_gbl: "data/proteome_dir/gbl_cds_aa.fasta"
+pep_glass_lizard: "data/proteome_dir/asian_glass_lizard_cds_aa.fasta"
+pep_anole: "data/proteome_dir/anole_cds_aa.fasta"
+pep_komodo: 'data/proteome_dir/komodo_cds_aa.fasta'
+alpha: 0.01
+degrees_of_freedom: 1
+N0: "data/proteome_dir/orthologs/Results_1/Phylogenetic_Hierarchical_Orthogroups/N0.tsv"
+dnds_thresh: 10
+species: ["anole", 'glass', 'gbl', 'komodo']
