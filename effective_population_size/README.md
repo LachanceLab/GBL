@@ -42,7 +42,7 @@ The long-reads and draft-assembly need to be downloaded separately. The entire w
 
 The results can visualized using the provided `./plot_psmc.py` script. For example, run:
 ```
-./plot_psmc.py -i psmc_results/gbl_diploid.psmc -d psmc_results/ -o ./ -p gbl_psmc -m 6.69e-9 -g 8 -l GBL -x 1e4 -X 1e6
+./plot_psmc.py -i psmc_results/gbl_diploid.psmc -d psmc_results/ -o ./ -p gbl_psmc -m 9.47e-9 -g "12.3" -l GBL -x 1e4 -X 1e6
 ``` 
 To get more options, do `./plot_psmc.py --help`.
 

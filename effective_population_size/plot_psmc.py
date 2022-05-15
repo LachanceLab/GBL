@@ -104,7 +104,7 @@ def plot_psmc(T, Ne, N0, mu, minimum_tmrca, maximum_tmrca, target_file=False, sc
         ax.set_xlabel('T in generations')
     elif mu and scaled_by_generation_time:
         ax.set_xlabel('Years before present (' + r'$\mu=$' + '{:.2e}'.format(mu) +
-                      r', $g=$' + '{:d})'.format(generation_time))
+                      r', $g=$' + '{:.1f})'.format(generation_time))
     else:
         ax.set_xlabel(r'$2\mu T$')
     ax.set_xscale('log')
@@ -192,7 +192,7 @@ def main(argv):
     parser.add_argument('-x', '--minimum_tmrca', default=0, type=float, help='Minimum TMRCA to plot. [0]')
     parser.add_argument('-X', '--maximum_tmrca', default=0, type=float, help='Maximum TMRCA to plot, 0 means all. [0]')
     parser.add_argument('--last_interval', action='store_true', default=False, help='Show last atomic interval')
-    parser.add_argument('-g', '--generation_time', required=False, type=int,
+    parser.add_argument('-g', '--generation_time', required=False, type=float,
                         help='Generation time to scale into years. If not provided, '
                              'results are expressed in terms of generations')
     parser.add_argument('-n', '--iteration', default=20, type=int, help='Iteration to plot. [20]')
