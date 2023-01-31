@@ -3,7 +3,7 @@
 Predicted protein-coding regions are searched against known venom proteins of heldodermatid lizards and vipers, which can be convineintly accessed through [VenomZone](https://venomzone.expasy.org/)<sup>1-3</sup>. The protein search is done using `jackhmmer` from the [HMMER3](http://hmmer.org/) package<sup>4</sup>. We use a Bonferroni corrected e-value cut-off of 0.0001 / n - where n is the number of queries - for the full sequence and 0.01 / n for the single-best scoring domain. Furthermore, only the best for each query is retained.
 
 ### Install HMMER3 and required Python packages
-`conda create env -f hmmer3.yaml`
+`conda env create -f hmmer3.yaml`
 
 ### Input files
 1. Protein sequences of annotated protein-coding regions<br>
@@ -43,7 +43,7 @@ exonerate --model protein2genome --percent 50 --softmasktarget TRUE --showvulgar
 ```
 
 Exonerate can be installed using conda from the provided .yaml file:<br>
-`conda create env -f exonerate.yaml`
+`conda env create -f exonerate.yaml`
 
 ### References
 
