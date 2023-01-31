@@ -75,7 +75,6 @@ def main(argv):
     df = merged.set_index('query').join(dnds.loc[:, ["dnds_gbl_selection", "transcript_id_gbl"]].set_index("transcript_id_gbl"))
     df.fillna('-', inplace=True)
     df.to_csv(output, sep='\t', index=True, header=True)
-    breakpoint()
 
 
 if __name__ == '__main__':
